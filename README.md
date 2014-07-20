@@ -10,7 +10,8 @@ teams in that league. Each team listing then contains a link to load that team v
 
 Install
 ============
-The latest debug version of the application is available for download by selecting the .apk from the list of files on this page. You will need to enable the "Unknow sources" option under "Security" on your Android device
+[The latest debug version of the application is available for download.](https://github.com/toddtarbox/slotw/blob/master/app-debug.apk)
+You will need to enable the "Unknow sources" option under "Security" on your Android device
 in order to allow applications to be installed outside of the Google Play Store.
 
 Screenshots
