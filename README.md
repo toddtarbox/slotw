@@ -7,6 +7,8 @@ in the future.
 This application will present a list of countries that have professional soccer leagues. Selecting a country from the list will load all professional soccer leagues in that country. Selecting a league will then load all
 teams in that league. Each team listing then contains a link to load that team via [ESPN FC](http://www.espnfc.com/).
 
+League news will also be listed at the bottom for those leagues where news is available. Clicking on a news headline will take you to that news item on [[ESPN FC](http://www.espnfc.com/).
+
 
 Install
 ============
