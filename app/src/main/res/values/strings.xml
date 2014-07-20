@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <string name="app_name">Soccer Leagues of The World</string>
+    <string name="app_name">Soccer Leagues of the World</string>
 
     <string name="select_country">Select a country: </string>
     <string name="select_league">Select a league: </string>
