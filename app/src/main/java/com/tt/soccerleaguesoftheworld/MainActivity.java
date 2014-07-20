@@ -3,8 +3,12 @@ package com.tt.soccerleaguesoftheworld;
 import android.app.Activity;
 import android.app.Fragment;
 import android.app.ProgressDialog;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.provider.Browser;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +17,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -44,7 +49,8 @@ public class MainActivity extends Activity {
         }
     }
 
-    public static class MainFragment extends Fragment implements AdapterView.OnItemSelectedListener {
+    public static class MainFragment extends Fragment
+            implements AdapterView.OnItemSelectedListener, View.OnClickListener {
 
         // TODO: The API_KEY really should be externalized and injected at build time to keep it somewhat
         // secret, but since this is just a demo app we won't worry about that now.
@@ -52,10 +58,12 @@ public class MainActivity extends Activity {
 
         private final String ALL_LEAGUES_REQUEST = "http://api.espn.com/v1/sports/soccer?apikey=%s";
         private final String LEAGUE_TEAMS_REQUEST = "http://api.espn.com/v1/sports/soccer/%s/teams?apikey=%s";
+        private final String LEAGUE_NEWS_REQUEST = "http://api.espn.com/v1/sports/soccer/%s/news?apikey=%s";
 
         private Spinner mCountrySpinner;
         private Spinner mLeagueSpinner;
         private ListView mTeamListView;
+        private TextView mLeagueNewsView;
 
         private int mSelectedCountryIndex = -1;
         private int mSelectedLeagueIndex = -1;
@@ -65,12 +73,16 @@ public class MainActivity extends Activity {
         private ArrayAdapter<String> mCountryListAdapter;
         private ArrayAdapter<String> mLeagueListAdapter;
         private TeamArrayAdapter mTeamListAdapter;
+        private JSONArray mLeagueNewsArray;
 
         private HashMap<String, ArrayList<String>> mCountryLeaguesMap = new HashMap<String, ArrayList<String>>();
         private HashMap<String, String> mLeagueIDMap = new HashMap<String, String>();
 
         private ProgressDialog mProgressDialog;
 
+        private final Handler mNewsHandler = new Handler();
+        private final int mNewsCycleTime = 3000; // millis
+        private int mCurrentNewsIndex = -1;
 
         public MainFragment() {
         }
@@ -82,6 +94,7 @@ public class MainActivity extends Activity {
             setRetainInstance(true);
 
             mProgressDialog = new ProgressDialog(getActivity());
+            mProgressDialog.setCancelable(false);
         }
 
         @Override
@@ -96,8 +109,11 @@ public class MainActivity extends Activity {
 
             mTeamListView = (ListView)rootView.findViewById(R.id.teams_list);
 
-            View emptyView = rootView.findViewById(R.id.empty);
+            View emptyView = rootView.findViewById(R.id.empty_title);
             mTeamListView.setEmptyView(emptyView);
+
+            mLeagueNewsView = (TextView)rootView.findViewById(R.id.league_news);
+            mLeagueNewsView.setOnClickListener(this);
 
             // Restore the adapters if necessary (ie. configuration change)
             if (mCountryListAdapter != null) {
@@ -134,6 +150,7 @@ public class MainActivity extends Activity {
                     // Restore user selection
                     mCountrySpinner.setSelection(mSelectedCountryIndex);
                 }
+
                 mSelectedCountryIndex = index;
                 mUpdateLeagues = true;
             } else if (adapterView.getId() == mLeagueSpinner.getId()) {
@@ -143,6 +160,9 @@ public class MainActivity extends Activity {
                     // Restore user selection
                     mLeagueSpinner.setSelection(mSelectedLeagueIndex);
                 }
+
+                // Load the latest news for the league
+                new LoadNewsTask().execute(index);
 
                 mSelectedLeagueIndex = index;
                 mUpdateTeams = true;
@@ -155,25 +175,23 @@ public class MainActivity extends Activity {
         /* End OnItemSelectedListener methods */
 
 
-        /* Helper Methods */
-        private String getLeaguesUrl() {
-            return String.format(ALL_LEAGUES_REQUEST, API_KEY);
-        }
+        /* OnClickListener methods */
 
-        private String getTeamsUrl(String leagueID) {
-            return String.format(LEAGUE_TEAMS_REQUEST, leagueID, API_KEY);
-        }
+        @Override
+        public void onClick(View view) {
+            if (view.getId() == mLeagueNewsView.getId()) {
+                try {
+                    // Get the mobile link from the news object
+                    JSONObject clickedOnNews = mLeagueNewsArray.getJSONObject(mCurrentNewsIndex);
+                    String url = clickedOnNews.getJSONObject("links").getJSONObject("mobile").getString("href");
 
-        private void showProgressDialog(int messageId) {
-            final String message = getString(messageId);
-            mProgressDialog.setMessage(message);
-            mProgressDialog.show();
+                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                    browserIntent.putExtra(Browser.EXTRA_APPLICATION_ID, getActivity().getPackageName());
+                    getActivity().startActivity(browserIntent);
+                } catch (Exception ex) { }
+            }
         }
-
-        private void cancelProgressDialog() {
-            mProgressDialog.cancel();
-        }
-        /* End Helper Methods */
+        /* End OnClickListener methods */
 
 
         /* AsyncTasks */
@@ -365,8 +383,113 @@ public class MainActivity extends Activity {
                 mTeamListView.setAdapter(mTeamListAdapter);
             }
         }
+
+        // A background task that allows us to fetch the latest news for the selected country/league
+        private class LoadNewsTask extends AsyncTask<Integer, Void, ArrayList<JSONObject>> {
+
+            @Override
+            protected void onPreExecute() {
+                super.onPreExecute();
+
+                mNewsHandler.removeCallbacks(mNewsRunnable);
+                mLeagueNewsArray = null;
+                mLeagueNewsView.setText(R.string.loading_news);
+                mCurrentNewsIndex = -1;
+            }
+
+            @Override
+            protected ArrayList<JSONObject> doInBackground(Integer... params) {
+                int leagueIndex = params[0];
+                String leagueName = mLeagueListAdapter.getItem(leagueIndex);
+                String leagueID = mLeagueIDMap.get(leagueName);
+
+                HttpClient client = new DefaultHttpClient();
+                String url = getNewsUrl(leagueID);
+                Log.d("LoadNewsTask", "Requesting news: " + url);
+
+                HttpGet request = new HttpGet(url);
+                request.addHeader("Content-type", "application/json");
+
+                ArrayList<JSONObject> teams = new ArrayList<JSONObject>();
+
+                try {
+                    String response = client.execute(request, new TeamsResponseHandler());
+                    if (!response.isEmpty()) {
+                        JSONObject json = new JSONObject(response);
+
+                        // From that response we want the 'headlines' array.
+                        mLeagueNewsArray = json.getJSONArray("headlines");
+                    }
+                } catch (Exception ex) {
+                    Log.e("MainActivity", ex.getMessage(), ex);
+                }
+
+                return teams;
+            }
+
+            @Override
+            protected void onPostExecute(ArrayList<JSONObject> teams) {
+                super.onPostExecute(teams);
+
+                if (mLeagueNewsArray != null && mLeagueNewsArray.length() > 0) {
+                    mNewsHandler.post(mNewsRunnable);
+                } else {
+                    mLeagueNewsView.setText(R.string.no_news_avail);
+                }
+            }
+        }
         /* End AsyncTasks */
 
+
+        /* Helper Methods */
+        private String getLeaguesUrl() {
+            return String.format(ALL_LEAGUES_REQUEST, API_KEY);
+        }
+
+        private String getTeamsUrl(String leagueID) {
+            return String.format(LEAGUE_TEAMS_REQUEST, leagueID, API_KEY);
+        }
+
+        private String getNewsUrl(String leagueID) {
+            return String.format(LEAGUE_NEWS_REQUEST, leagueID, API_KEY);
+        }
+
+        private void showProgressDialog(int messageId) {
+            final String message = getString(messageId);
+            mProgressDialog.setMessage(message);
+            mProgressDialog.show();
+        }
+
+        private void cancelProgressDialog() {
+            mProgressDialog.cancel();
+        }
+
+        // Runnable for updating the displayed news headline on a timer
+        private Runnable mNewsRunnable = new Runnable() {
+            @Override
+            public void run() {
+                updateNews();
+                mNewsHandler.postDelayed(mNewsRunnable, mNewsCycleTime);
+            }
+        };
+
+        private void updateNews() {
+            if (mLeagueNewsArray != null && mLeagueNewsArray.length() > 0) {
+                if (mCurrentNewsIndex + 1 < mLeagueNewsArray.length()) {
+                    mCurrentNewsIndex++;
+                } else {
+                    mCurrentNewsIndex = 0;
+                }
+
+                String newsText = "";
+                try {
+                    JSONObject currentNews = mLeagueNewsArray.getJSONObject(mCurrentNewsIndex);
+                    newsText = currentNews.getString("headline");
+                } catch (JSONException ex) { }
+
+                mLeagueNewsView.setText(newsText);
+            }
+        }
 
         // Allows us to directly handle web service responses.
         private class TeamsResponseHandler extends BasicResponseHandler {
@@ -384,5 +507,6 @@ public class MainActivity extends Activity {
                 }
             }
         }
+        /* End Helper Methods */
     }
 }

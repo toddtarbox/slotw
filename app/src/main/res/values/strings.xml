@@ -9,6 +9,8 @@
     <string name="loading_countries">Loading countries&#8230;</string>
     <string name="loading_teams">Loading teams&#8230;</string>
     <string name="no_teams_avail">No Teams Available</string>
+    <string name="loading_news">Loading league news&#8230;</string>
+    <string name="no_news_avail">No League News Available</string>
 
     <string name="team_name">Team Name: %1$s</string>
     <string name="team_nickname">Nickname: %1$s</string>
