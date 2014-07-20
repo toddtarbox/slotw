@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Soccer Leagues of The World</string>
+
+    <string name="select_country">Select a country: </string>
+    <string name="select_league">Select a league: </string>
+
+    <string name="loading_countries">Loading countries&#8230;</string>
+    <string name="loading_teams">Loading teams&#8230;</string>
+    <string name="no_teams_avail">No Teams Available</string>
+
+    <string name="team_name">Team Name: %1$s</string>
+    <string name="team_nickname">Nickname: %1$s</string>
+    <string name="team_location">Location: %1$s</string>
+    <string name="view_on_espn">View on ESPN FC</string>
+
+</resources>
