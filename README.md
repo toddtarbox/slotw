@@ -17,7 +17,9 @@ Screenshots
 ============
 
 Nexus 5
+
 ![n5](http://content.screencast.com/users/ttarbox/folders/Jing/media/8434f629-2dc6-4de6-85be-62152c455937/00000004.png)
 
 Nexus 7
+
 ![n7](http://content.screencast.com/users/ttarbox/folders/Jing/media/c92bf1ce-22bb-4686-82bd-b9455e008d76/00000005.png)
