@@ -13,3 +13,11 @@ Install
 The latest debug version of the application is available for download by selecting the .apk from the list of files on this page. You will need to enable the "Unknow sources" option under "Security" on your Android device
 in order to allow applications to be installed outside of the Google Play Store.
 
+Screenshots
+============
+
+Nexus 5
+![n5](http://screencast.com/t/uyeoAMmddJJ)
+
+Nexus 7
+![n7](http://screencast.com/t/xZQ55VbnX7k)
