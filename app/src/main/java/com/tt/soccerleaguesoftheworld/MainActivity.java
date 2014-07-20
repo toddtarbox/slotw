@@ -102,6 +102,8 @@ public class MainActivity extends Activity {
             // Restore the adapters if necessary (ie. configuration change)
             if (mCountryListAdapter != null) {
                 mCountrySpinner.setAdapter(mCountryListAdapter);
+
+                // Don't update the list of leagues on a config change
                 mUpdateLeagues = false;
             } else {
                 new FetchCountriesTask().execute();
@@ -109,6 +111,8 @@ public class MainActivity extends Activity {
 
             if (mLeagueListAdapter != null) {
                 mLeagueSpinner.setAdapter(mLeagueListAdapter);
+
+                // Don't update the list of teams on a config change
                 mUpdateTeams = false;
             }
 
@@ -119,6 +123,7 @@ public class MainActivity extends Activity {
             return rootView;
         }
 
+
         /* OnItemSelectedListener methods */
         @Override
         public void onItemSelected(AdapterView<?> adapterView, View view, int index, long l) {
@@ -126,6 +131,7 @@ public class MainActivity extends Activity {
                 if (mUpdateLeagues) {
                     new UpdateLeaguesTask().execute(index);
                 } else if (mSelectedCountryIndex >= 0) {
+                    // Restore user selection
                     mCountrySpinner.setSelection(mSelectedCountryIndex);
                 }
                 mSelectedCountryIndex = index;
@@ -134,6 +140,7 @@ public class MainActivity extends Activity {
                 if (mUpdateTeams) {
                     new UpdateTeamsTask().execute(index);
                 } else if (mSelectedLeagueIndex >= 0) {
+                    // Restore user selection
                     mLeagueSpinner.setSelection(mSelectedLeagueIndex);
                 }
 
@@ -147,6 +154,7 @@ public class MainActivity extends Activity {
         }
         /* End OnItemSelectedListener methods */
 
+
         /* Helper Methods */
         private String getLeaguesUrl() {
             return String.format(ALL_LEAGUES_REQUEST, API_KEY);
@@ -155,10 +163,21 @@ public class MainActivity extends Activity {
         private String getTeamsUrl(String leagueID) {
             return String.format(LEAGUE_TEAMS_REQUEST, leagueID, API_KEY);
         }
+
+        private void showProgressDialog(int messageId) {
+            final String message = getString(messageId);
+            mProgressDialog.setMessage(message);
+            mProgressDialog.show();
+        }
+
+        private void cancelProgressDialog() {
+            mProgressDialog.cancel();
+        }
         /* End Helper Methods */
 
+
         /* AsyncTasks */
-        // A background task that allows us to fetch all the leagues of the world
+        // A background task that allows us to fetch all the countries who have professional leagues
         private class FetchCountriesTask extends AsyncTask<Void, Void, ArrayList<String>> {
 
             @Override
@@ -212,13 +231,16 @@ public class MainActivity extends Activity {
                             String leagueShortName = league.getString("shortName");
                             String leagueDisplay = String.format("%s (%s)", leagueName, leagueShortName);
                             countryLeagues.add(leagueDisplay);
+
+                            // Sort the leagues ascending by league name
+                            Collections.sort(countryLeagues);
+
                             mCountryLeaguesMap.put(countryName, countryLeagues);
 
                             // Add the league ID to the map
                             mLeagueIDMap.put(leagueDisplay, league.getString("abbreviation"));
                         }
                     }
-
                 } catch (Exception ex) {
                     Log.e("MainActivity", ex.getMessage(), ex);
                 }
@@ -248,7 +270,7 @@ public class MainActivity extends Activity {
                 super.onPreExecute();
 
                 mLeagueListAdapter = null;
-                mLeagueSpinner.setAdapter(mLeagueListAdapter);
+                mLeagueSpinner.setAdapter(null);
             }
 
             @Override
@@ -263,9 +285,6 @@ public class MainActivity extends Activity {
             @Override
             protected void onPostExecute(ArrayList<String> leagues) {
                 super.onPostExecute(leagues);
-
-                // Sort the leagues ascending by league name
-                Collections.sort(leagues);
 
                 mLeagueListAdapter = new ArrayAdapter<String>(getActivity(), android.R.layout.simple_spinner_dropdown_item, leagues);
                 mLeagueSpinner.setAdapter(mLeagueListAdapter);
@@ -282,7 +301,7 @@ public class MainActivity extends Activity {
                 showProgressDialog(R.string.loading_teams);
 
                 mTeamListAdapter = null;
-                mTeamListView.setAdapter(mTeamListAdapter);
+                mTeamListView.setAdapter(null);
             }
 
             @Override
@@ -316,6 +335,18 @@ public class MainActivity extends Activity {
                             JSONObject team = teamsArray.getJSONObject(i);
                             teams.add(team);
                         }
+
+                        // Sort the teams ascending by team name
+                        Collections.sort(teams, new Comparator<JSONObject>() {
+                            @Override
+                            public int compare(JSONObject jsonObject, JSONObject jsonObject2) {
+                                try {
+                                    return jsonObject.getString("name").compareToIgnoreCase(jsonObject2.getString("name"));
+                                } catch (JSONException ex) {
+                                    return 0;
+                                }
+                            }
+                        });
                     }
                 } catch (Exception ex) {
                     Log.e("MainActivity", ex.getMessage(), ex);
@@ -328,18 +359,6 @@ public class MainActivity extends Activity {
             protected void onPostExecute(ArrayList<JSONObject> teams) {
                 super.onPostExecute(teams);
 
-                // Sort the teams ascending by team name
-                Collections.sort(teams, new Comparator<JSONObject>() {
-                    @Override
-                    public int compare(JSONObject jsonObject, JSONObject jsonObject2) {
-                        try {
-                            return jsonObject.getString("name").compareToIgnoreCase(jsonObject2.getString("name"));
-                        } catch (JSONException ex) {
-                            return 0;
-                        }
-                    }
-                });
-
                 cancelProgressDialog();
 
                 mTeamListAdapter = new TeamArrayAdapter(getActivity(), teams);
@@ -348,6 +367,8 @@ public class MainActivity extends Activity {
         }
         /* End AsyncTasks */
 
+
+        // Allows us to directly handle web service responses.
         private class TeamsResponseHandler extends BasicResponseHandler {
 
             @Override
@@ -362,16 +383,6 @@ public class MainActivity extends Activity {
                     return "";
                 }
             }
-        }
-
-        private void showProgressDialog(int messageId) {
-            final String message = getString(messageId);
-            mProgressDialog.setMessage(message);
-            mProgressDialog.show();
-        }
-
-        private void cancelProgressDialog() {
-            mProgressDialog.cancel();
         }
     }
 }
